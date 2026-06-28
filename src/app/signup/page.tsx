@@ -1,362 +1,210 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import {
-  User,
-  Mail,
-  Lock,
-  Check,
-  AlertCircle,
-  ShieldCheck,
-} from "lucide-react";
-import styles from "./signup.module.css";
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { Facebook, Mail } from 'lucide-react';
 
-// 1. Zod validation schema
-const signupSchema = z
-  .object({
-    fullName: z.string().min(2, "Full Name must be at least 2 characters"),
-    email: z.string().email("Please enter a valid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string().min(6, "Please confirm your password"),
-    terms: z.boolean().refine((val) => val === true, {
-      message: "You must accept the Terms of Service",
-    }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
+type SignupValues = {
+  name: string;
+  email: string;
+  password: string;
+  acceptTerms: boolean;
+};
 
-type SignupFormData = z.infer<typeof signupSchema>;
-
-type Strength = "none" | "weak" | "fair" | "strong";
+type SignupErrors = Partial<Record<keyof SignupValues, string>>;
 
 export default function SignupPage() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-
-  // 2. Setup react-hook-form
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setError,
-    formState: { errors },
-  } = useForm<SignupFormData>({
-    resolver: zodResolver(signupSchema),
-    defaultValues: {
-      fullName: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-      terms: false,
-    },
-    mode: "onChange", // Enable inline validation on input change
+  const [values, setValues] = useState<SignupValues>({
+    name: '',
+    email: '',
+    password: '',
+    acceptTerms: false,
   });
+  const [errors, setErrors] = useState<SignupErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const passwordValue = watch("password", "");
+  const hasErrors = useMemo(() => Object.values(errors).some(Boolean), [errors]);
 
-  // 3. Password strength evaluation
-  const getPasswordStrength = (pwd: string): Strength => {
-    if (!pwd) return "none";
-    if (pwd.length < 6) return "weak";
-
-    let score = 0;
-    if (/[A-Z]/.test(pwd)) score++;
-    if (/[a-z]/.test(pwd)) score++;
-    if (/[0-9]/.test(pwd)) score++;
-    if (/[^A-Za-z0-9]/.test(pwd)) score++;
-
-    if (pwd.length >= 8 && score >= 3) return "strong";
-    if (pwd.length >= 6 && score >= 2) return "fair";
-    return "weak";
-  };
-
-  const strength = getPasswordStrength(passwordValue);
-
-  const strengthLabels: Record<Strength, { label: string; class: string }> = {
-    none: { label: "No password", class: styles["strength-none"] },
-    weak: { label: "Weak", class: styles["strength-weak"] },
-    fair: { label: "Fair", class: styles["strength-fair"] },
-    strong: { label: "Strong", class: styles["strength-strong"] },
-  };
-
-  // 4. Form Submit handler
-  const onSubmit = async (data: SignupFormData) => {
-    setIsLoading(true);
-    setApiError(null);
-
-    // Simulate API Request
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    if (data.email.toLowerCase() === "taken@example.com") {
-      setApiError("This email address is already in use.");
-      setError("email", {
-        type: "manual",
-        message: "Email address is already taken",
-      });
-      setIsLoading(false);
-    } else {
-      // Success: Redirect to dashboard
-      router.push(`/dashboard?name=${encodeURIComponent(data.fullName)}`);
+  const validate = (nextValues: SignupValues) => {
+    const nextErrors: SignupErrors = {};
+    if (!nextValues.name.trim()) {
+      nextErrors.name = 'Full name is required.';
+    } else if (nextValues.name.trim().length < 2) {
+      nextErrors.name = 'Enter your full name.';
     }
+    if (!nextValues.email.trim()) {
+      nextErrors.email = 'Email is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextValues.email)) {
+      nextErrors.email = 'Enter a valid email address.';
+    }
+    if (!nextValues.password.trim()) {
+      nextErrors.password = 'Password is required.';
+    } else if (nextValues.password.length < 8) {
+      nextErrors.password = 'Password must be at least 8 characters.';
+    }
+    if (!nextValues.acceptTerms) {
+      nextErrors.acceptTerms = 'You must accept the terms to continue.';
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const isValid = validate(values);
+    if (!isValid) return;
+    setIsSubmitting(true);
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    setIsSubmitting(false);
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.card}>
-        <div className={styles.header}>
-          <div className={styles.logo}>Hamplard</div>
-          <p className={styles.subtitle}>Create your account to get started</p>
-        </div>
+    <div className="min-h-screen bg-[#EEEDFE] p-4 sm:p-6">
+      <div className="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-lg lg:grid-cols-2">
+        <section className="order-2 flex items-center justify-center p-6 sm:p-10 lg:order-1">
+          <div className="w-full max-w-md">
+            <Link href="/" className="mb-8 inline-block font-display text-3xl font-bold text-[#26215C]">
+              Hamplard
+            </Link>
+            <h1 className="mb-2 text-3xl font-bold text-[#26215C]">Create your account</h1>
+            <p className="mb-6 text-sm text-[#554F99]">
+              Join Hamplard and start learning practical, career-ready skills.
+            </p>
 
-        {apiError && (
-          <div className={styles.apiErrorBanner}>
-            <AlertCircle size={16} />
-            <span>{apiError}</span>
-          </div>
-        )}
-
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          className={styles.form}
-          noValidate
-        >
-          {/* Full Name */}
-          <div className={styles.formGroup}>
-            <label htmlFor="fullName" className={styles.label}>
-              Full Name
-            </label>
-            <div className={styles.inputWrapper}>
-              <input
-                id="fullName"
-                type="text"
-                disabled={isLoading}
-                placeholder="John Doe"
-                className={`${styles.input} ${errors.fullName ? styles.inputError : ""}`}
-                {...register("fullName")}
-              />
-              <User size={16} className={styles.inputIcon} />
-            </div>
-            {errors.fullName && (
-              <span className={styles.errorMessage}>
-                <AlertCircle size={12} /> {errors.fullName.message}
-              </span>
-            )}
-          </div>
-
-          {/* Email Address */}
-          <div className={styles.formGroup}>
-            <label htmlFor="email" className={styles.label}>
-              Email Address
-            </label>
-            <div className={styles.inputWrapper}>
-              <input
-                id="email"
-                type="email"
-                disabled={isLoading}
-                placeholder="you@example.com"
-                className={`${styles.input} ${errors.email ? styles.inputError : ""}`}
-                {...register("email")}
-              />
-              <Mail size={16} className={styles.inputIcon} />
-            </div>
-            {errors.email && (
-              <span className={styles.errorMessage}>
-                <AlertCircle size={12} /> {errors.email.message}
-              </span>
-            )}
-          </div>
-
-          {/* Password */}
-          <div className={styles.formGroup}>
-            <label htmlFor="password" className={styles.label}>
-              Password
-            </label>
-            <div className={styles.inputWrapper}>
-              <input
-                id="password"
-                type="password"
-                disabled={isLoading}
-                placeholder="••••••••"
-                className={`${styles.input} ${errors.password ? styles.inputError : ""}`}
-                {...register("password")}
-              />
-              <Lock size={16} className={styles.inputIcon} />
-            </div>
-            {errors.password && (
-              <span className={styles.errorMessage}>
-                <AlertCircle size={12} /> {errors.password.message}
-              </span>
-            )}
-
-            {/* Password Strength Indicator */}
-            {passwordValue && (
-              <div className={styles.strengthMeter}>
-                <div className={styles.strengthLabel}>
-                  <span>Password Strength:</span>
-                  <span
-                    className={`${styles.strengthValue} ${strengthLabels[strength].class}`}
-                  >
-                    {strengthLabels[strength].label}
-                  </span>
-                </div>
-                <div className={styles.strengthBars}>
-                  <div
-                    className={`${styles.bar} ${
-                      strength !== "none" ? styles["bar-weak"] : ""
-                    }`}
-                  />
-                  <div
-                    className={`${styles.bar} ${
-                      strength === "fair" || strength === "strong"
-                        ? styles["bar-fair"]
-                        : ""
-                    }`}
-                  />
-                  <div
-                    className={`${styles.bar} ${
-                      strength === "strong" ? styles["bar-strong"] : ""
-                    }`}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Confirm Password */}
-          <div className={styles.formGroup}>
-            <label htmlFor="confirmPassword" className={styles.label}>
-              Confirm Password
-            </label>
-            <div className={styles.inputWrapper}>
-              <input
-                id="confirmPassword"
-                type="password"
-                disabled={isLoading}
-                placeholder="••••••••"
-                className={`${styles.input} ${
-                  errors.confirmPassword ? styles.inputError : ""
-                }`}
-                {...register("confirmPassword")}
-              />
-              <Lock size={16} className={styles.inputIcon} />
-            </div>
-            {errors.confirmPassword && (
-              <span className={styles.errorMessage}>
-                <AlertCircle size={12} /> {errors.confirmPassword.message}
-              </span>
-            )}
-          </div>
-
-          {/* Terms of Service Checkbox */}
-          <div className={styles.formGroup}>
-            <label htmlFor="terms" className={styles.checkboxGroup}>
-              <div className={styles.checkboxContainer}>
+            <form className="space-y-4" onSubmit={onSubmit} noValidate>
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-[#26215C]" htmlFor="name">
+                  Full name
+                </label>
                 <input
-                  id="terms"
-                  type="checkbox"
-                  disabled={isLoading}
-                  className={styles.checkboxInput}
-                  {...register("terms")}
+                  id="name"
+                  type="text"
+                  value={values.name}
+                  onChange={(event) => setValues((prev) => ({ ...prev, name: event.target.value }))}
+                  onBlur={() => validate(values)}
+                  className={`w-full rounded-xl border px-4 py-2.5 text-sm text-[#26215C] outline-none transition ${
+                    errors.name ? 'border-red-400 bg-red-50/40' : 'border-[#D3D0F2] focus:border-[#7F77DD]'
+                  }`}
+                  placeholder="Your full name"
+                  aria-invalid={!!errors.name}
                 />
-                <div className={styles.customCheckbox}>
-                  <Check
-                    className={styles.checkmark}
-                    size={12}
-                    strokeWidth={3}
-                  />
-                </div>
+                {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
               </div>
-              <span className={styles.checkboxLabel}>
-                I agree to the <Link href="/terms">Terms of Service</Link> and{" "}
-                <Link href="/privacy">Privacy Policy</Link>
-              </span>
-            </label>
-            {errors.terms && (
-              <span className={styles.errorMessage}>
-                <AlertCircle size={12} /> {errors.terms.message}
-              </span>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-[#26215C]" htmlFor="email">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={values.email}
+                  onChange={(event) => setValues((prev) => ({ ...prev, email: event.target.value }))}
+                  onBlur={() => validate(values)}
+                  className={`w-full rounded-xl border px-4 py-2.5 text-sm text-[#26215C] outline-none transition ${
+                    errors.email ? 'border-red-400 bg-red-50/40' : 'border-[#D3D0F2] focus:border-[#7F77DD]'
+                  }`}
+                  placeholder="you@example.com"
+                  aria-invalid={!!errors.email}
+                />
+                {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-[#26215C]" htmlFor="password">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={values.password}
+                  onChange={(event) => setValues((prev) => ({ ...prev, password: event.target.value }))}
+                  onBlur={() => validate(values)}
+                  className={`w-full rounded-xl border px-4 py-2.5 text-sm text-[#26215C] outline-none transition ${
+                    errors.password ? 'border-red-400 bg-red-50/40' : 'border-[#D3D0F2] focus:border-[#7F77DD]'
+                  }`}
+                  placeholder="Create a password"
+                  aria-invalid={!!errors.password}
+                />
+                {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
+              </div>
+
+              <label className="inline-flex items-start gap-2 text-sm text-[#26215C]">
+                <input
+                  type="checkbox"
+                  checked={values.acceptTerms}
+                  onChange={(event) => setValues((prev) => ({ ...prev, acceptTerms: event.target.checked }))}
+                  className="mt-0.5 h-4 w-4 rounded border-[#B3ADDF] text-[#7F77DD] focus:ring-[#7F77DD]"
+                />
+                <span>
+                  I agree to the{' '}
+                  <Link href="#" className="font-medium text-[#3C3489] hover:underline">
+                    terms and privacy policy
+                  </Link>
+                  .
+                </span>
+              </label>
+              {errors.acceptTerms && <p className="text-xs text-red-600">{errors.acceptTerms}</p>}
+
+              <button
+                type="submit"
+                className="w-full rounded-xl bg-[#7F77DD] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#3C3489]"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Creating account...' : 'Signup'}
+              </button>
+
+              <div className="relative py-2">
+                <div className="h-px bg-[#E0DEFA]" />
+                <span className="absolute left-1/2 top-0 -translate-x-1/2 bg-white px-3 text-xs font-medium text-[#6B66A6]">
+                  or continue with
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button type="button" className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D3D0F2] px-4 py-2.5 text-sm font-medium text-[#26215C] hover:bg-[#EEEDFE]">
+                  <Mail className="h-4 w-4" />
+                  Google
+                </button>
+                <button type="button" className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#D3D0F2] px-4 py-2.5 text-sm font-medium text-[#26215C] hover:bg-[#EEEDFE]">
+                  <Facebook className="h-4 w-4" />
+                  Facebook
+                </button>
+              </div>
+            </form>
+
+            {hasErrors && (
+              <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                Please fix the highlighted fields and try again.
+              </p>
             )}
+
+            <p className="mt-6 text-sm text-[#554F99]">
+              Already have an account?{' '}
+              <Link href="/login" className="font-semibold text-[#3C3489] hover:underline">
+                Login
+              </Link>
+            </p>
           </div>
+        </section>
 
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={styles.submitBtn}
-          >
-            {isLoading ? (
-              <>
-                <div className={styles.spinner} />
-                <span>Creating Account...</span>
-              </>
-            ) : (
-              <>
-                <ShieldCheck size={18} />
-                <span>Sign Up</span>
-              </>
-            )}
-          </button>
-        </form>
-
-        <div className={styles.divider}>or register with</div>
-
-        {/* Social Buttons */}
-        <div className={styles.socialContainer}>
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={() => alert("Google Signup mock triggered!")}
-            className={styles.socialBtn}
-          >
-            {/* Custom Premium Google SVG */}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                fill="#4285F4"
-              />
-              <path
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                fill="#34A853"
-              />
-              <path
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                fill="#FBBC05"
-              />
-              <path
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                fill="#EA4335"
-              />
-            </svg>
-            <span>Google</span>
-          </button>
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={() => alert("Facebook Signup mock triggered!")}
-            className={styles.socialBtn}
-          >
-            {/* Custom Premium Facebook SVG */}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#1877F2">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-            </svg>
-            <span>Facebook</span>
-          </button>
-        </div>
-
-        <div className={styles.footer}>
-          Already have an account?
-          <Link href="/login" className={styles.footerLink}>
-            Log in
-          </Link>
-        </div>
+        <section className="order-1 flex min-h-[260px] items-center justify-center bg-gradient-to-br from-[#26215C] to-[#3C3489] p-8 lg:order-2">
+          <div className="max-w-sm text-white">
+            <p className="mb-2 text-xs uppercase tracking-[0.18em] text-[#EEEDFE]">Get started</p>
+            <h2 className="mb-4 font-display text-4xl font-bold leading-tight">
+              Your future skills start with one account.
+            </h2>
+            <p className="text-sm leading-relaxed text-[#EEEDFE]">
+              Learn from trusted instructors, earn certificates, and grow your confidence with every lesson.
+            </p>
+            <div className="mt-6 space-y-2 text-sm text-[#EEEDFE]">
+              <p className="rounded-lg bg-white/10 px-3 py-2">Structured courses and practical projects</p>
+              <p className="rounded-lg bg-white/10 px-3 py-2">Track milestones from beginner to advanced</p>
+              <p className="rounded-lg bg-white/10 px-3 py-2">Join a community focused on real-world skills</p>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
